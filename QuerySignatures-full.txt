@@ -1,0 +1,126 @@
+SPARQL query for sigature verification
+----------------------------------------------------
+Due to the backtrack and recursion properties of the SPARQL engine, such engine
+explores all possible combinations in a query search. Therefore, it was necessary to add a code (composed by three numbers) to the interface name and their associated operations to associate them with their parameters. 
+
+For example, given the following ontology:
+           :withdrawal388  :hasParameter  :cardno388 .
+           :withdrawal388  :hasParameterName  "cardno1" .
+           :cardno388      :hasNameParameter "cardno1" .
+           
+if we perform the query:
+           :withdrawal388  :hasParameter  
+we would obtain cardno388.
+
+However, in case of having defined (in the ontology) withdrawal instead of withdrawal388. The  query
+           :withdrawal  :hasParameter  
+would retrieve the parameters associated to all withdrawal instances, which can potentially be more than one in case more than one interface has withdrawal as an operation name.
+
+In lines 40-65 we employed the operation BIND and library functions fn:string-length and fn:substring to extract such codes to check mismatches among operations of a required and a required interface (lines 70-101).
+
+The full SPARQL query code is presented below
+
+1..PREFIX   : <http://www.ejemplo.org/#> 
+2..PREFIX fn: <http://www.w3.org/2005/xpath-functions#>
+3..SELECT DISTINCT ?ErrorMessage WHERE
+4..{  
+5..........?interf1 :typeInterface :required ;
+6.................. :hasInterfaceName %s ;
+7.................. :hasMethod ?MethodInterface1 .
+8..........?interf1 :hasInterfaceName ?nameinterface1 .
+9.?MethodInterface1 :hasMethodName ?NameMethod ;
+10................. :hasNumParMethod ?numparm1 ;
+11................. :NomTypeRet ?nametyperet1 .
+12.........?interf1 :hasMethod2 ?MethodEmpty . 
+13..FILTER NOT EXISTS{?interf2 :hasMethod2 ?MethodEmpty.}
+14..?MethodEmpty :hasMethodName ?NameMethodEmpty .
+15..OPTIONAL 
+16..{  
+17.?MethodInterface1 :hasParameter ?parameter1 ;
+18.................. :hasParameterName ?nameparameter1 .
+19.......?parameter1 :hasNameParameter ?nameparameter1 ;
+20.................. :hasNameTypePar ?nametypeparameter1 ;
+21.................. :hasNameIndex  ?nameindex1 ;
+22.................. :hasNameDir   ?namedir1 ;
+23..}
+24............?interf2 :typeInterface :provided ;
+25.................... :hasInterfaceName %s ;
+26.................... :hasMethod ?MethodInterface2 .     
+27............?interf2 :hasInterfaceName ?nameinterface2 .      
+28...?MethodInterface2 :hasMethodName ?NameMethod ;   
+29.................... :hasNumParMethod ?numparm2 ;
+30.................... :NomTypeRet ?nametyperet2 .
+31.OPTIONAL 
+32.{  
+33...?MethodInterface2 :hasParameter ?parameter2 ;
+34.................... :hasParameterName ?nameparameter2 .
+35.........?parameter2 :hasNameParameter ?nameparameter2 ;
+36.................... :hasNameTypePar ?nametypeparameter2 ;
+37.................... :hasNameIndex   ?nameindex2 ;
+38.................... :hasNameDir     ?namedir2 .
+39.}
+40... BIND(if(bound(?nametypeparameter1), 
+41........ fn:substring(?nametypeparameter1, 
+42........ fn:string-length(?nametypeparameter1), 1 ),"")
+43......AS ?typecode1 )
+44... BIND(if(bound(?nametypeparameter1), 
+45........ fn:substring(?nametypeparameter1, 1,
+46........ fn:string-length(?nametypeparameter1)-1 ),"") 
+47......AS ?nametypepar1 )
+48... BIND(if(bound(?nametypeparameter2), fn:substring(
+49........ ?nametypeparameter2, 
+50........ fn:string-length(?nametypeparameter2), 1 ),"") 
+51......AS ?typecode2 )
+52... BIND(if(bound(?nametypeparameter2), fn:substring(
+53........ ?nametypeparameter2, 1,fn:string-length(
+54........ ?nametypeparameter2)-1 ),"")
+55......AS ?nametypepar2 )
+56... BIND(if(bound(?nameparameter1), fn:substring(
+57........ ?nameparameter1, fn:string-length(?nameparameter1),
+58........ 1 ),"") AS ?numcode1 )
+59... BIND(if(bound(?nameparameter1), fn:substring(?nameparameter1,       
+60........ 1,fn:string-length(?nameparameter1)-1 ),"") 
+61......AS ?namepar1 )
+62... BIND(if(bound(?nameparameter2), fn:substring(?nameparameter2, 
+63........ fn:string-length(?nameparameter2), 1 ),"") AS ?numcode2 )
+64....BIND(if(bound(?nameparameter2), fn:substring(?nameparameter2, 
+65........ 1,fn:string-length(?nameparameter2)-1 ),"") AS ?namepar2 )  
+66....BIND(if(bound(?NameMethodEmpty), "Operation "+ ?NameMethodEmpty 
+67........ +"() in interface "+ ?nameinterface1 +
+68........ " Not Found in Interface "+ ?nameinterface2,"") 
+69......AS ?MethodNot )        
+70. BIND(
+71.. IF(?nametyperet1 != ?nametyperet2, "Type return operation mismatch
+72..... between "+ ?nameinterface1+"."+ ?NameMethod+"()"+" return "+ 
+73..... ?nametyperet1 + " and " + ?nameinterface2+"."+ ?NameMethod +
+74..... "() return "+?nametyperet2,   
+75..... IF(?numparm1 != ?numparm2, "Wrong number of parameters between "
+76........ + ?nameinterface1+"."+ ?NameMethod +"() has "+ ?numparm1 +" 
+77........ and "+?nameinterface2+"."+ ?NameMethod+"() has "+?numparm2,
+78........ IF(?namedir1 != ?namedir2 && ?namepar1 = ?namepar2, 
+79........... "Direction mismatch between parameters " + 
+80........... ?nameinterface1+"."+ ?NameMethod + "("+?namepar1+")" +
+81........... " has: "+ ?namedir1 +" and "+ ?nameinterface2 +"."+ 
+82........... ?NameMethod + "("+?namepar2+")" + " has: "+?namedir2, 
+83........... IF(?nameindex1 != ?nameindex2 && ?namepar1 = ?namepar2 &&  
+84.............. ?typecode1 = ?numcode1 && ?numcode1 = ?nameindex1 && 
+85.............. ?typecode2 = ?numcode2 && ?numcode2 = ?nameindex2,  
+86.............. "Different position between parameters " +
+87.............. ?nameinterface1+"."+ ?NameMethod+"() "+ ?namepar1+
+88.............. " pos: " + ?nameindex1 + " and " + ?nameinterface2+"." + 
+89.............. ?NameMethod+"() "+ ?namepar2 +  " pos: "+?nameindex2, 
+90.............. IF(?nametypepar1 != ?nametypepar2 && ?namepar1 = 
+91................. ?namepar2 && ?typecode1 = ?numcode1,"Error in type  
+92................. mismatch between parameters " + 
+93................. ?nameinterface1+"."+ ?NameMethod+" ("+?nametypepar1
+94.................  +" "+?namepar1+") has type: "+ ?nametypepar1 + " and " 
+95.................  + ?nameinterface2+"."+?NameMethod+" ("+ ?nametypepar2
+96.................  +" "+?namepar2 +")" + " has type: "+?nametypepar2, ""             
+97.................)  
+98..............)
+99............)
+100.........)
+101......) AS ?ErrorMessage0   
+102..)
+103..BIND( ?ErrorMessage0 + "\n" + ?MethodNot AS ?ErrorMessage )         
+104.} 
