@@ -18,7 +18,7 @@ would retrieve the parameters associated to all withdrawal instances, which can 
 
 In lines 40-65 we employed the operation BIND and library functions fn:string-length and fn:substring to extract such codes to check mismatches among operations of a required and a required interface (lines 70-101).
 
-The full SPARQL query code is presented below
+The full SPARQL query code is presented below.
 
 1..PREFIX   : <http://www.ejemplo.org/#> 
 2..PREFIX fn: <http://www.w3.org/2005/xpath-functions#>
